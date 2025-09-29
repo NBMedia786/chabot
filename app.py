@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 from flask import Flask, jsonify, send_from_directory, abort, request
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+load_dotenv()
 
 
 
