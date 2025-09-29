@@ -1,14 +1,15 @@
-import os, random, threading, time, mimetypes, base64
-from email.message import EmailMessage  # not used for SendGrid; kept for clarity
+import os, random, time, mimetypes, base64
 from pathlib import Path
 from datetime import datetime
 import requests
+
 from flask import Flask, jsonify, send_from_directory, abort, request
 from werkzeug.utils import secure_filename
+
 from dotenv import load_dotenv
 load_dotenv()
 
-
+# ================== Config (from env) ==================
 ELEVEN_API_KEY   = os.getenv("ELEVEN_API_KEY", "")
 AGENT_ID         = os.getenv("AGENT_ID", "")
 GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
@@ -19,43 +20,46 @@ FROM_EMAIL       = os.getenv("FROM_EMAIL", "")
 if not ELEVEN_API_KEY or not AGENT_ID:
     print("[WARN] ELEVEN_API_KEY / AGENT_ID not set. Live voice will not work until you set them.")
 
-
-# Paths
-ROOT_DIR   = Path(__file__).parent
-DATA_DIR   = ROOT_DIR / "data"
+# ================== Paths ==================
+BASE_DIR = Path(__file__).resolve().parent       # <-- index.html lives here
+DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-app = Flask(__name__, static_url_path="", static_folder=str())
+# Serve static files directly from the same folder as app.py
+# static_url_path="" means static files are available at "/<filename>"
+app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
 
-# pip install flask-cors
+# CORS (frontend on different domain)
+# NOTE: remove trailing slash in origin
 from flask_cors import CORS
-CORS(app, resources={r"/*": {"origins": "http://ronit.nbmedia.co.in/"}})
+CORS(app, resources={r"/*": {"origins": "http://ronit.nbmedia.co.in"}})
 
-
-# ============ Health ============
+# ================== Health ==================
 @app.get("/healthz")
 def healthz():
     return jsonify({"status": "ok", "time": datetime.utcnow().isoformat() + "Z"})
 
-
-# ============ Frontend ============
+# ================== Frontend ==================
 @app.get("/")
 def index():
-    index_path = / "index.html"
+    index_path = BASE_DIR / "index.html"
     if not index_path.exists():
-        abort(404, description="/index.html not found")
-    return send_from_directory(str(), "index.html")
+        abort(404, description=f"{index_path} not found")
+    # This uses Flask's static file handler pointing at BASE_DIR
+    return app.send_static_file("index.html")
 
-
+# If you keep extra assets next to app.py (script.js, styles.css, images, etc.),
+# Flask will serve them automatically via the static handler because static_folder=BASE_DIR
+# Example: <script src="/script.js"></script> will serve BASE_DIR/script.js
+# The catch-all below is optional; Flask static already handles it.
 @app.get("/<path:path>")
 def static_files(path):
-    file_path =  / path
+    file_path = BASE_DIR / path
     if file_path.exists():
-        return send_from_directory(str(), path)
+        return send_from_directory(str(BASE_DIR), path)
     abort(404)
 
-
-# ============ ElevenLabs: WS token ============
+# ================== ElevenLabs: WS token ==================
 @app.get("/conversation-token")
 def conversation_token():
     url = "https://api.elevenlabs.io/v1/convai/conversation/token"
@@ -72,8 +76,7 @@ def conversation_token():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": "ElevenLabs request failed", "details": str(e)}), 502
 
-
-# ============ Capture + Schedule ============
+# ================== Upload + Schedule (SendGrid send_at) ==================
 @app.post("/upload-session")
 def upload_session():
     email = (request.form.get("email") or "").strip()
@@ -105,29 +108,8 @@ def upload_session():
     )
     return jsonify({"ok": True, "scheduled_in_seconds": delay_seconds, "send_at_unix": send_at_unix})
 
-
-
-# ============ Background Job Helpers ============
-def _delayed_blueprint_and_email(email: str, transcript: str, audio_path: str | None, delay_seconds: int):
-    try:
-        time.sleep(delay_seconds)
-        blueprint = _call_gemini_blueprint(transcript)
-        _send_email_with_optional_audio(
-            to_email=email,
-            subject="Your Conversation Blueprint",
-            body=blueprint,
-            attachment_path=audio_path,
-        )
-        print(f"[MAIL] Sent to {email}")
-    except Exception as e:
-        print(f"[ERROR] delayed job failed: {e}")
-
-
+# ================== Helpers ==================
 def _call_gemini_blueprint(transcript: str) -> str:
-    """
-    Calls Gemini 1.5 Flash to create a concise blueprint from the transcript.
-    Falls back to a simple outline if GEMINI_API_KEY is not set or request fails.
-    """
     prompt = (
         "You are a conversation analyst. Create a clear, bullet-style blueprint from the user's chat transcript.\n"
         "- Identify goals, blockers, emotions, and decisions.\n"
@@ -155,12 +137,10 @@ def _call_gemini_blueprint(transcript: str) -> str:
         print(f"[WARN] Gemini error: {e}")
         return _fallback_outline(transcript)
 
-
 def _fallback_outline(transcript: str) -> str:
     lines = [l.strip() for l in (transcript or "").splitlines() if l.strip()]
     head = lines[:10]
     return "Quick Outline:\n- " + "\n- ".join(head or ["(no transcript content)"])
-
 
 def _send_email_with_optional_audio(to_email, subject, body, attachment_path=None, send_at_unix=None):
     if not SENDGRID_API_KEY: raise RuntimeError("SENDGRID_API_KEY not set")
@@ -173,7 +153,7 @@ def _send_email_with_optional_audio(to_email, subject, body, attachment_path=Non
         "content": [{"type": "text/plain", "value": body}],
     }
     if send_at_unix:
-        payload["send_at"] = send_at_unix
+        payload["send_at"] = send_at_unix  # schedule delivery via SendGrid
 
     if attachment_path and Path(attachment_path).exists():
         mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -192,3 +172,9 @@ def _send_email_with_optional_audio(to_email, subject, body, attachment_path=Non
     )
     if r.status_code != 202:
         raise RuntimeError(f"SendGrid error {r.status_code}: {r.text}")
+
+# ================== Local dev ==================
+if __name__ == "__main__":
+    # In production (Render), use: gunicorn app:app
+    port = int(os.getenv("PORT", "5000"))
+    app.run(host="127.0.0.1", port=port, debug=True)
