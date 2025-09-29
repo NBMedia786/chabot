@@ -9,20 +9,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
-if not ELEVEN_API_KEY or not AGENT_ID:
-    print("[WARN] ELEVENLABS_API_KEY / AGENT_ID not set. Live voice will not work until you set them.")
-
-
-
-
-# top of app.py
-ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY", "")
-AGENT_ID       = os.getenv("AGENT_ID", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+ELEVEN_API_KEY   = os.getenv("ELEVEN_API_KEY", "")
+AGENT_ID         = os.getenv("AGENT_ID", "")
+GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL     = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 FROM_EMAIL       = os.getenv("FROM_EMAIL", "")
+
+if not ELEVEN_API_KEY or not AGENT_ID:
+    print("[WARN] ELEVEN_API_KEY / AGENT_ID not set. Live voice will not work until you set them.")
 
 
 # Paths
