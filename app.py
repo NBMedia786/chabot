@@ -22,11 +22,10 @@ if not ELEVEN_API_KEY or not AGENT_ID:
 
 # Paths
 ROOT_DIR   = Path(__file__).parent
-PUBLIC_DIR = ROOT_DIR / "public"
 DATA_DIR   = ROOT_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-app = Flask(__name__, static_url_path="", static_folder=str(PUBLIC_DIR))
+app = Flask(__name__, static_url_path="", static_folder=str())
 
 # pip install flask-cors
 from flask_cors import CORS
@@ -42,17 +41,17 @@ def healthz():
 # ============ Frontend ============
 @app.get("/")
 def index():
-    index_path = PUBLIC_DIR / "index.html"
+    index_path = / "index.html"
     if not index_path.exists():
-        abort(404, description="public/index.html not found")
-    return send_from_directory(str(PUBLIC_DIR), "index.html")
+        abort(404, description="/index.html not found")
+    return send_from_directory(str(), "index.html")
 
 
 @app.get("/<path:path>")
 def static_files(path):
-    file_path = PUBLIC_DIR / path
+    file_path =  / path
     if file_path.exists():
-        return send_from_directory(str(PUBLIC_DIR), path)
+        return send_from_directory(str(), path)
     abort(404)
 
 
