@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ronit Relationship AI Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#05080f; --bg2:#071020; --text:#eef1f9; --muted:#9aa3b2;
+      --ringA:#a07bff; --ringB:#77c4ff;
+      --accent:#22d3ee; --accent2:#60a5fa; --accent3:#2dd4bf;
+    }
+    /* === BACKGROUND PORTED FROM YOUR FILE === */
+    html,body{height:100%}
+    body{
+      margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      color:var(--text); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      padding:24px; overflow:hidden;
+      background:
+        radial-gradient(1200px 900px at 70% -10%, #0b1530 0%, var(--bg) 45%, #03060c 100%),
+        conic-gradient(from 180deg at 50% 0%, rgba(34,211,238,.08), transparent 30%, rgba(96,165,250,.06), transparent 70%, rgba(45,212,191,.06));
+      background-blend-mode: screen, normal;
+    }
+    .bg-grid{position:fixed;inset:0;pointer-events:none;opacity:.22;mix-blend:screen}
+    .particles{position:fixed;inset:0;pointer-events:none}
+    .particle{position:absolute;width:2px;height:2px;background:linear-gradient(45deg,var(--accent),transparent);filter:drop-shadow(0 0 4px var(--accent));opacity:.35;animation:float 12s linear infinite}
+    @keyframes float{0%{transform:translateY(0)}100%{transform:translateY(-120vh)}}
+
+    /* === OUR EXISTING JARVIS ORB UI (unchanged look) === */
+    h1{ margin:0 0 12px; font-weight:700; letter-spacing:.4px; font-family:Orbitron, system-ui; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; margin-bottom:18px; }
+
+    input[type="email"]{
+      padding:12px 14px; border-radius:12px; border:1px solid #28334d; background:#0e1528; color:var(--text); width:280px;
+      outline:none; box-shadow: inset 0 0 0 1px rgba(119,196,255,.08);
+    }
+    input[type="email"]::placeholder{ color:#7f8aa3; }
+    button{
+      background: linear-gradient(180deg, #1c2440, #121a32);
+      border:1px solid #2f3a5c; color:#fff; padding:10px 16px; border-radius:12px; cursor:pointer;
+      box-shadow: 0 0 0 0 rgba(119,196,255,0); transition: box-shadow .2s ease, transform .08s ease, border-color .2s;
+    }
+    button:hover{ border-color:#425280; box-shadow:0 0 24px 0 rgba(119,196,255,.12); }
+    button:active{ transform: translateY(1px); }
+
+    .orb{
+      position:relative; width:200px; height:200px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; isolation:isolate;
+      background: radial-gradient(circle at 30% 30%, rgba(160,123,255,.35), rgba(119,196,255,.12));
+      box-shadow: inset 0 0 40px rgba(160,123,255,.25), 0 0 60px rgba(119,196,255,.15);
+      transition: transform .08s linear, box-shadow .2s ease;
+    }
+    .orb::before{
+      content:""; position:absolute; inset:-6px; border-radius:50%;
+      background:
+        radial-gradient(circle, rgba(119,196,255,.25), transparent 60%) padding-box,
+        conic-gradient(from 0deg, rgba(160,123,255,.4), rgba(119,196,255,.4), rgba(160,123,255,.4)) border-box;
+      -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0) border-box;
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      border:3px solid transparent; filter: blur(12px);
+      opacity:.65; animation: ring-rotate 12s linear infinite;
+    }
+    @keyframes ring-rotate{ to { transform: rotate(360deg); } }
+    .orb.connected{ box-shadow: inset 0 0 60px rgba(160,123,255,.35), 0 0 90px rgba(119,196,255,.25); animation: orb-breathe 2.8s ease-in-out infinite; }
+    @keyframes orb-breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+
+    /* Two canvases: user/mic + bot/output */
+    #wavesUser, #wavesBot{
+      position:absolute; inset:0; border-radius:50%;
+      filter: drop-shadow(0 0 6px rgba(119,196,255,.35));
+      pointer-events:none;
+    }
+
+    /* Mic button with continuous spinning ring (small, inside orb) */
+    #micBtn{
+      position:relative; z-index:3; width:68px; height:68px; border-radius:50%;
+      display:grid; place-items:center; font-size:26px; background: radial-gradient(circle at 30% 30%, #1e2a53, #10172b);
+      border:1px solid #2f3a5c;
+      box-shadow: inset 0 0 14px rgba(119,196,255,.2), 0 0 24px rgba(160,123,255,.18);
+      transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    #micBtn:hover{ border-color:#425280; box-shadow: inset 0 0 18px rgba(119,196,255,.28), 0 0 36px rgba(160,123,255,.28); }
+    .connected #micBtn{ animation: mic-pulse 1.8s ease-in-out infinite; }
+    @keyframes mic-pulse{ 0%,100%{box-shadow:inset 0 0 18px rgba(119,196,255,.3),0 0 36px rgba(160,123,255,.32)} 50%{box-shadow:inset 0 0 28px rgba(119,196,255,.45),0 0 56px rgba(160,123,255,.45)} }
+
+    /* Spinning conic ring hugging mic button */
+    #micBtn::after{
+      content:""; position:absolute; inset:-10px; border-radius:50%;
+      background: conic-gradient(from 0deg, var(--ringA), var(--ringB), var(--ringA));
+      -webkit-mask: radial-gradient(circle, transparent 36px, #000 37px);
+      mask: radial-gradient(circle, transparent 36px, #000 37px);
+      filter: blur(1px) saturate(1.2);
+      animation: micRingSpin 2.2s linear infinite;
+      opacity:.9;
+    }
+    @keyframes micRingSpin { to { transform: rotate(360deg); } }
+
+    .muted{ opacity:.7; font-size:.9rem; color:var(--muted); margin-top:10px; }
+    .small{ font-size:.85rem; color:var(--muted); margin-top:8px; }
+    .hidden{ display:none !important; }
+  </style>
+</head>
+<body>
+  <!-- GRID OVERLAY + PARTICLES (from your file) -->
+  <svg class="bg-grid" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(96,165,250,.18)" stroke-width="0.3"/>
+    </pattern></defs>
+    <rect width="100%" height="100%" fill="url(#grid)"/>
+  </svg>
+  <div class="particles" id="particles"></div>
+
+  <h1>Ronit Relationship AI Coach</h1>
+
+  <div class="row">
+    <input id="email" type="email" placeholder="Your email (to receive the blueprint)" />
+    <button id="saveBtn" title="Send summary later">Save &amp; Schedule Summary</button>
+  </div>
+
+  <div class="orb" id="orb">
+    <!-- Voice waves (unchanged) -->
+    <canvas id="wavesUser" width="200" height="200" aria-hidden="true"></canvas>
+    <canvas id="wavesBot"  width="200" height="200" aria-hidden="true"></canvas>
+    <!-- TOGGLE MIC BUTTON (small, inside orb) -->
+    <button id="micBtn" title="Start / Stop">🎤</button>
+  </div>
+  <div id="promptText" class="muted hidden">Tap to start talking</div>
+
+  <div class="small">Jarvis visuals on • transcript captured silently for email.</div>
+
+  <script type="module">
+    // === PARTICLES FROM YOUR FILE (background only) ===
+    const prt = document.getElementById('particles');
+    for(let i=0;i<60;i++){
+      const p=document.createElement('div'); p.className='particle';
+      p.style.left=Math.random()*100+'%';
+      p.style.bottom=(-10+Math.random()*20)+'vh';
+      p.style.animationDelay=(Math.random()*12)+'s';
+      p.style.opacity=.15+Math.random()*.35;
+      prt.appendChild(p);
+    }
+
+    // === OUR EXISTING LOGIC (unchanged) ===
+    import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm";
+
+    const orb        = document.getElementById("orb");
+    const micBtn     = document.getElementById("micBtn");   // <-- toggle mic
+    const emailInput = document.getElementById("email");
+    const saveBtn    = document.getElementById("saveBtn");
+    const promptEl   = document.getElementById("promptText");
+
+    let conversation = null;
+    let connected = false;
+    let userStopped = false;
+    let reconnecting = false;
+    let retries = 0;
+    const MAX_RETRIES = 3;
+    let heartbeatTimer = null;
+
+    // Speech recognition (hidden UI)
+    let recognition;
+    let accumulatedTranscript = "";
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const srSupported = !!SR;
+
+    // Recording
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    // ====== VISUALIZERS (unchanged) ======
+    // User/Mic
+    const wavesUser = document.getElementById("wavesUser");
+    const uctx  = wavesUser.getContext("2d");
+    let audioCtx = null;
+    let analyser = null;
+    let dataArray = null;
+    let rafUser = null;
+
+    // Bot/Agent
+    const wavesBot = document.getElementById("wavesBot");
+    const bctx  = wavesBot.getContext("2d");
+    let rafBot = null;
+    let botAnimT = 0;
+
+    function initSpeechRecognition() {
+      if (!srSupported) return;
+      recognition = new SR();
+      recognition.lang = "en-US";
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) accumulatedTranscript += r[0].transcript.trim() + "\n";
+        }
+      };
+      recognition.onerror = (e) => console.warn("SR error:", e);
+      recognition.onend = () => { if (connected && recognition) { try { recognition.start(); } catch {} } };
+    }
+
+    async function startVoice(){
+      try { mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch { alert("Microphone permission is required."); return; }
+
+      try {
+        const r = await fetch("/conversation-token");
+        if(!r.ok) throw new Error("Token fetch failed");
+        const { token } = await r.json();
+
+        conversation = await Conversation.startSession({
+          conversationToken: token,
+          connectionType: "webrtc",
+          onConnect: () => {
+            connected = true; retries = 0; reconnecting = false;
+            orb.classList.add("connected");
+            promptEl.textContent = "Listening…";
+            startHeartbeat();
+
+            if (!recognition) initSpeechRecognition();
+            try { recognition && recognition.start(); } catch {}
+
+            startRecorder(mediaStream);
+            startUserVisualizer(mediaStream);
+            startBotVisualizer(); // Bot ripples
+          },
+          onDisconnect: () => handleDisconnect("disconnected"),
+          onError: (e) => handleDisconnect("error", e),
+        });
+      } catch (err) {
+        console.error("startVoice failed:", err);
+      }
+    }
+
+    async function stopVoice(){
+      userStopped = true;
+      try { if(conversation) await conversation.endSession(); } catch(_){}
+      conversation = null;
+      connected = false;
+      orb.classList.remove("connected");
+      promptEl.textContent = "Tap to start talking";
+      stopHeartbeat();
+
+      try { recognition && recognition.stop(); } catch {}
+      stopRecorder();
+      stopUserVisualizer();
+      stopBotVisualizer();
+
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    }
+
+    function handleDisconnect(label, err){
+      console.warn("session", label, err||"");
+      connected = false;
+      orb.classList.remove("connected");
+      promptEl.textContent = "Tap to start talking";
+      stopHeartbeat();
+      try { recognition && recognition.stop(); } catch {}
+      stopRecorder();
+      stopUserVisualizer();
+      stopBotVisualizer();
+      if(!userStopped) triggerReconnect();
+    }
+
+    function triggerReconnect(){
+      if (reconnecting || userStopped) return;
+      if (retries >= MAX_RETRIES) { console.warn("gave up reconnecting"); return; }
+      reconnecting = true; retries++;
+      const delay = Math.min(1500 * retries, 4000);
+      setTimeout(async ()=>{
+        if(userStopped){ reconnecting=false; return; }
+        console.log("reconnecting attempt", retries);
+        await startVoice();
+        reconnecting = false;
+      }, delay);
+    }
+
+    function startHeartbeat(){
+      stopHeartbeat();
+      heartbeatTimer = setInterval(async ()=>{
+        if(!connected || !conversation) return;
+        try { await conversation.getInputVolume(); } // keepalive
+        catch { triggerReconnect(); }
+      }, 8000);
+    }
+    function stopHeartbeat(){ if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer=null; } }
+
+    function startRecorder(stream) {
+      recordedChunks = [];
+      try { mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" }); }
+      catch { mediaRecorder = new MediaRecorder(stream); }
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.start(500);
+    }
+    function stopRecorder() {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    }
+
+    // ---- User/Mic visualizer ----
+    function startUserVisualizer(stream){
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      const src = audioCtx.createMediaStreamSource(stream);
+      src.connect(analyser);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      drawUserWaves();
+    }
+    function stopUserVisualizer(){
+      if (rafUser) cancelAnimationFrame(rafUser);
+      rafUser = null;
+      if (uctx) uctx.clearRect(0,0,wavesUser.width,wavesUser.height);
+      analyser = null; dataArray = null;
+    }
+    function drawUserWaves(){
+      if (!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+      const W = wavesUser.width, H = wavesUser.height, cx=W/2, cy=H/2, baseR=44, maxR=86;
+      uctx.clearRect(0,0,W,H);
+
+      // soft glow
+      uctx.beginPath();
+      const grd = uctx.createRadialGradient(cx,cy,baseR*0.6, cx,cy,maxR);
+      grd.addColorStop(0, "rgba(160,123,255,.20)");
+      grd.addColorStop(1, "rgba(119,196,255,.06)");
+      uctx.fillStyle = grd; uctx.arc(cx,cy,maxR,0,Math.PI*2); uctx.fill();
+
+      const bars = 64;
+      for (let i=0;i<bars;i++){
+        const t = i/bars;
+        const amp = dataArray[i]/255;
+        const r1 = baseR + amp*22;
+        const r2 = r1 + 10 + amp*18;
+        const a  = t * Math.PI*2;
+        const x1 = cx + r1*Math.cos(a), y1 = cy + r1*Math.sin(a);
+        const x2 = cx + r2*Math.cos(a), y2 = cy + r2*Math.sin(a);
+        uctx.strokeStyle = `rgba(${160 + Math.floor((119-160)*t)}, ${123 + Math.floor((196-123)*t)}, 255, ${0.22 + 0.4*amp})`;
+        uctx.lineWidth = 2; uctx.beginPath(); uctx.moveTo(x1,y1); uctx.lineTo(x2,y2); uctx.stroke();
+      }
+
+      // inner ring
+      const avg = dataArray.reduce((a,b)=>a+b,0)/dataArray.length;
+      const pulse = baseR + (avg/255)*10;
+      uctx.beginPath(); uctx.lineWidth=3; uctx.strokeStyle="rgba(119,196,255,.5)";
+      uctx.arc(cx,cy,pulse,0,Math.PI*2); uctx.stroke();
+
+      rafUser = requestAnimationFrame(drawUserWaves);
+    }
+
+    // ---- Bot/Agent visualizer ----
+    function startBotVisualizer(){
+      stopBotVisualizer();
+      drawBotWaves();
+    }
+    function stopBotVisualizer(){
+      if (rafBot) cancelAnimationFrame(rafBot);
+      rafBot = null;
+      if (bctx) bctx.clearRect(0,0,wavesBot.width,wavesBot.height);
+      botAnimT = 0;
+    }
+    async function drawBotWaves(){
+      const W = wavesBot.width, H = wavesBot.height, cx=W/2, cy=H/2, baseR=64, maxR=94;
+      bctx.clearRect(0,0,W,H);
+
+      // SDK output volume if available, else smooth ripple
+      let outVol = 0;
+      if (connected && conversation && typeof conversation.getOutputVolume === "function") {
+        try { outVol = await conversation.getOutputVolume(); } catch { outVol = 0; }
+      } else {
+        botAnimT += 0.06;
+        outVol = 0.5 + 0.5*Math.sin(botAnimT);
+      }
+
+      const amp = Math.max(0, Math.min(1, outVol));
+      const ring = baseR + amp*16;
+
+      // soft outer aura
+      bctx.beginPath();
+      const grd = bctx.createRadialGradient(cx,cy,baseR*0.7, cx,cy,maxR);
+      grd.addColorStop(0, "rgba(119,196,255,.10)");
+      grd.addColorStop(1, "rgba(160,123,255,.05)");
+      bctx.fillStyle = grd; bctx.arc(cx,cy,maxR,0,Math.PI*2); bctx.fill();
+
+      // ripples
+      const ripples = 4;
+      for (let i=0;i<ripples;i++){
+        const r = ring + i*6 + Math.sin(botAnimT + i*0.8)*3*amp;
+        bctx.beginPath(); bctx.lineWidth = 2;
+        bctx.strokeStyle = `rgba(160,123,255, ${0.25 - i*0.05})`;
+        bctx.arc(cx,cy,r,0,Math.PI*2); bctx.stroke();
+      }
+
+      requestAnimationFrame(drawBotWaves);
+    }
+
+    // === TOGGLE MIC (ported behavior): one button toggles start/stop ===
+    micBtn.addEventListener("click", async () => {
+      if(!connected){
+        userStopped=false;
+        await startVoice();   // starts mic + session + visuals
+      } else {
+        await stopVoice();    // stops session + visuals + mic tracks
+      }
+    });
+
+    // Save & schedule summary via backend (unchanged)
+    saveBtn.addEventListener("click", async () => {
+      const email = emailInput.value.trim();
+      if (!email) { alert("Please enter your email first."); return; }
+
+      const finalTranscript = accumulatedTranscript.trim();
+      if (!finalTranscript) { alert("No transcript captured yet. Say something first 🙂"); return; }
+
+      const fd = new FormData();
+      fd.append("email", email);
+      fd.append("transcript", finalTranscript);
+
+      if (recordedChunks.length > 0) {
+        const blob = new Blob(recordedChunks, { type: "audio/webm" });
+        fd.append("audio", blob, "mic_recording.webm");
+      }
+
+      try {
+        const resp = await fetch("/upload-session", { method: "POST", body: fd });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data?.error || "Upload failed");
+        alert("Great! Your blueprint will be emailed later (random 1–12 hours).");
+      } catch (e) {
+        console.error(e);
+        alert("Sorry, could not schedule the summary. Check console for details.");
+      }
+    });
+  </script>
+</body>
+</html>
