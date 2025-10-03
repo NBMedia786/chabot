@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, List, Dict
 
 from flask import Flask, jsonify, send_from_directory, abort, request, render_template_string
+from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -58,7 +59,10 @@ DATA_DIR   = ROOT_DIR / "data"
 # PUBLIC_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
 
-app = Flask(__name__, static_url_path="", static_folder=str(ROOT_DIR))
+app = Flask(__name__, static_url_path="", static_folder=str(PUBLIC_DIR))
+# ---- CORS: allow your Hostinger frontend + local dev ----
+_frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")  # e.g., https://yourdomain.com
+CORS(app, resources={r"/*": {"origins": [_frontend_origin, "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5500"]}}, supports_credentials=True)
 
 # ===== HTTP session with retries =====
 session = requests.Session()
@@ -400,19 +404,24 @@ def _call_gemini_mindmap_blueprint(transcript: str) -> str:
         print(f"[WARN] Gemini API error: {e}")
         return f"CONVERSATION SUMMARY (Gemini API Error):\n{transcript[:200]}..."
 
+
+@app.route("/healthz", methods=["GET"])
+def healthcheck():
+    return jsonify({"ok": True, "time": datetime.utcnow().isoformat() + "Z"}), 200
+
 # ===== Main =====
+
+
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "1") == "1"
     print("=== Email config ===")
     print("FROM_EMAIL:", FROM_EMAIL)
-    print("FROM_NAME :", FROM_NAME)
-    if SENDGRID_API_KEY:
-        print("SENDGRID_API_KEY: present")
-        print("SENDGRID_SANDBOX :", SENDGRID_SANDBOX)
-    else:
-        print("SENDGRID_API_KEY: MISSING (will try SMTP fallback if configured)")
-    if SMTP_HOST:
-        print(f"SMTP: {SMTP_HOST}:{SMTP_PORT}, user={SMTP_USER!r}, TLS={SMTP_TLS}")
-    print("Supabase configured:", bool(supabase))
-    app.run(host="0.0.0.0", port=PORT, debug=True)
-
-
+    print("FROM_NAME:", FROM_NAME)
+    print("REPLY_TO:", REPLY_TO)
+    print("Using SendGrid:", bool(SENDGRID_API_KEY))
+    print("Supabase:", bool(SUPABASE_URL and SUPABASE_KEY))
+    print("Agent ID set:", bool(AGENT_ID))
+    print("ElevenLabs key set:", bool(ELEVEN_API_KEY))
+    print("Frontend allowed origin:", os.getenv("FRONTEND_ORIGIN"))
+    app.run(host="0.0.0.0", port=port, debug=debug)
