@@ -1,12 +1,4 @@
-# app.py — Render backend for Hostinger frontend
-# Features:
-# - ElevenLabs conversation token (with participant_name from ?name=)
-# - Supabase profiles upsert (name/email/phone/age)
-# - Email via SendGrid (preferred) with SMTP fallback
-# - Gemini-powered mindmap blueprint + shareable link
-# - CORS restricted to your Hostinger domain
-# - Safe absolute URLs behind proxy (Render)
-# - Friendly "/" JSON (no 404 spam), plus /healthz
+
 
 import os
 import random
