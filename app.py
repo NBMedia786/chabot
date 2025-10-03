@@ -59,7 +59,7 @@ DATA_DIR   = ROOT_DIR / "data"
 # PUBLIC_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
 
-app = Flask(__name__, static_url_path="", static_folder=str(PUBLIC_DIR))
+app = Flask(__name__, static_url_path="", static_folder=str(ROOT_DIR))
 # ---- CORS: allow your Hostinger frontend + local dev ----
 _frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")  # e.g., https://yourdomain.com
 CORS(app, resources={r"/*": {"origins": [_frontend_origin, "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5500"]}}, supports_credentials=True)
