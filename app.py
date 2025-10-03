@@ -57,8 +57,8 @@ supabase: Optional[Client] = _sb()
 # Prefer env override; otherwise allow your Hostinger domain(s)
 _env_allowed = [o.strip() for o in (os.getenv("ALLOWED_ORIGINS") or "").split(",") if o.strip()]
 ALLOWED_ORIGINS = _env_allowed or [
-    "https://YOUR-HOSTINGER-DOMAIN",
-    "https://www.YOUR-HOSTINGER-DOMAIN",
+    "https://ronit.nbmedia.co.in/",
+    "https://ronit.nbmedia.co.in",
 ]
 
 # ===== Paths / app =====
